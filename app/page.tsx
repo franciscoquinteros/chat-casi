@@ -28,7 +28,7 @@ interface MessageResponse {
   message?: string;
   data?: {
     messageId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
