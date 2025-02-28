@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 
-// Configura el socket con la URL del backend local y opciones adicionales para depuración
 let socket: any;
 
 interface Message {
@@ -344,7 +343,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         )}
         <div ref={messagesEndRef} />
       </div>
-      <div className="p-4 bg-gray-100 border-t flex items-center space-x-2">
+      <div className="p-4 bg-gray-100 border-t flex items-center space-x-2 text-black">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
