@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import io from 'socket.io-client';
+import io, { Socket } from 'socket.io-client';
 
-let socket: any;
+let socket: Socket;
 
 interface Message {
   id?: string;
@@ -21,6 +21,15 @@ interface Conversation {
   id: string;
   userId: string;
   status: string;
+}
+
+interface MessageResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    messageId?: string;
+    [key: string]: any;
+  };
 }
 
 interface ChatProps {
@@ -203,7 +212,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     socket.on('userConversations', handleUserConversations);
 
     // Evento personalizado para depuración
-    socket.on('error', (error: any) => {
+    socket.on('error', (error: Error) => {
       console.error('Error en el socket:', error);
       setConnectionStatus(`Error en el socket: ${error.message || 'Desconocido'}`);
     });
@@ -247,7 +256,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     console.log('Enviando mensaje con datos:', messageData);
     
     // Enviar mensaje al servidor
-    socket.emit('clientMessage', messageData, (response: any) => {
+    socket.emit('clientMessage', messageData, (response: MessageResponse) => {
       // Callback opcional para confirmar que el mensaje fue recibido
       console.log('Respuesta del servidor al enviar mensaje:', response);
     });
