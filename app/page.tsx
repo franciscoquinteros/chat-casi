@@ -104,7 +104,6 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     // Función para manejar la conexión
     const handleConnect = () => {
       console.log('Cliente conectado al servidor WebSocket');
-      console.log('Socket ID:', socket.id);
       setSocketId(socket.id || null);
       setIsConnected(true);
       setConnectionStatus('Conectado');
@@ -117,37 +116,28 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       
       // Unirse al chat como usuario
       socket.emit('joinChat', { userId: chatId }, (response: ChatResponse) => {
-        console.log('Respuesta de joinChat:', response);
         if (response && response.success) {
           // Solicitar las conversaciones del usuario
-          console.log('Solicitando conversaciones para usuario:', chatId);
-          // Verificar si hay conversaciones existentes para este usuario
           socket.emit('getUserConversations', { userId: chatId });
         }
       });
       
       // Verificar la conexión
-      socket.emit('checkConnection', (response: ConnectionResponse) => {
-        console.log('Estado de conexión:', response);
-      });
+      socket.emit('checkConnection');
     };
 
     // Función para crear una conversación para el usuario
     const createConversation = () => {
       // Evitar crear múltiples conversaciones
       if (conversationCreated.current) {
-        console.log('Ya se ha creado una conversación, no se creará otra');
         return;
       }
       
       // Usar WebSocket para crear una conversación
       if (socket.connected) {
-        console.log('Creando conversación vía WebSocket para usuario:', chatId);
         socket.emit('createConversation', { userId: chatId }, (response: ChatResponse) => {
-          console.log('Respuesta de createConversation:', response);
           if (response.success && response.data && response.data.conversationId) {
             setActiveConversation(response.data.conversationId);
-            console.log('ID de conversación activa:', response.data.conversationId);
             
             // Marcar que ya se ha creado una conversación
             conversationCreated.current = true;
@@ -266,7 +256,6 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         if (message.conversationId) {
           // Si no tenemos una conversación activa pero el mensaje tiene una, actualizar la conversación activa
           if (!activeConversation) {
-            console.log('Actualizando conversación activa con:', message.conversationId);
             setActiveConversation(message.conversationId);
             conversationCreated.current = true;
           }
@@ -301,7 +290,6 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
 
     // Función para manejar el historial de mensajes
     const handleMessageHistory = (messages: Message[]) => {
-      console.log('Historial de mensajes recibido:', messages.length);
       if (Array.isArray(messages)) {
         // Asegurar que todos los mensajes tengan IDs
         const messagesWithIds = messages.map(msg => ({
@@ -343,7 +331,6 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         if (activeConv) {
           setActiveConversation(activeConv.id);
           conversationCreated.current = true; // Marcar que ya tenemos una conversación
-          console.log('ID de conversación activa establecida:', activeConv.id);
           
           // Solicitar mensajes de esta conversación
           socket.emit('getMessages', { conversationId: activeConv.id });
@@ -375,7 +362,6 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         scrollToBottom();
       } else if (data.conversationId) {
         // Si no coincide pero tenemos un ID de conversación válido, actualizar la conversación activa
-        console.log('Actualizando conversación activa en handleAgentAssigned:', data.conversationId);
         setActiveConversation(data.conversationId);
         conversationCreated.current = true;
         
@@ -450,10 +436,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     // Configurar un ping periódico para mantener la conexión activa
     const pingInterval = setInterval(() => {
       if (socketRef.current && socketRef.current.connected) {
-        console.log('Enviando ping al servidor...');
-        socketRef.current.emit('checkConnection', (response: ConnectionResponse) => {
-          console.log('Respuesta de ping:', response);
-        });
+        socketRef.current.emit('checkConnection');
       }
     }, 30000); // Cada 30 segundos
     
