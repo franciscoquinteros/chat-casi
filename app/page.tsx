@@ -11,8 +11,7 @@ interface Message {
   agentId?: string | null;
   timestamp: string;
   conversationId?: string;
-  // Campo local para tracking
-  _localId?: string;
+  _localId?: string; // Local field for tracking
 }
 
 interface Conversation {
@@ -31,7 +30,6 @@ interface MessageResponse {
   timestamp?: unknown;
 }
 
-// Añadir nueva interfaz para las respuestas de joinChat y createConversation
 interface ChatResponse {
   success: boolean;
   message?: string;
@@ -42,14 +40,14 @@ interface ChatResponse {
 }
 
 interface ChatProps {
-  chatId: string; // El userId del cliente
+  chatId: string; // The client's userId
 }
 
 const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('Conectando al chat...');
+  const [connectionStatus, setConnectionStatus] = useState('Connecting to chat...');
   const [socketId, setSocketId] = useState<string | null>(null);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -65,10 +63,8 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Función para inicializar el socket
   const initializeSocket = () => {
     if (socketRef.current) {
-      // Limpiar listeners existentes antes de reconectar
       socketRef.current.off();
       socketRef.current.close();
     }
@@ -84,23 +80,19 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     });
     
     socketInitialized.current = true;
-    
-    // Configurar event listeners inmediatamente
     setupSocketListeners();
   };
 
-  // Función para configurar los event listeners del socket
   const setupSocketListeners = () => {
     if (!socketRef.current) return;
     
     const socket = socketRef.current;
 
-    // Función para manejar la conexión
     const handleConnect = () => {
-      console.log('Cliente conectado al servidor WebSocket');
+      console.log('Client connected to WebSocket server');
       setSocketId(socket.id || null);
       setIsConnected(true);
-      setConnectionStatus('Conectado');
+      setConnectionStatus('Connected');
       reconnectAttempts.current = 0;
       
       if (reconnectInterval.current) {
@@ -108,54 +100,43 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         reconnectInterval.current = null;
       }
       
-      // Unirse al chat como usuario
       socket.emit('joinChat', { userId: chatId }, (response: ChatResponse) => {
         if (response && response.success) {
-          // Solicitar las conversaciones del usuario
           socket.emit('getUserConversations', { userId: chatId });
         }
       });
       
-      // Verificar la conexión
       socket.emit('checkConnection');
     };
 
-    // Función para crear una conversación para el usuario
     const createConversation = () => {
-      // Evitar crear múltiples conversaciones
       if (conversationCreated.current) {
         return;
       }
       
-      // Usar WebSocket para crear una conversación
       if (socket.connected) {
         socket.emit('createConversation', { userId: chatId }, (response: ChatResponse) => {
           if (response.success && response.data && response.data.conversationId) {
             setActiveConversation(response.data.conversationId);
-            
-            // Marcar que ya se ha creado una conversación
             conversationCreated.current = true;
-            
-            // Solicitar el historial de mensajes de esta conversación
             socket.emit('getMessages', { conversationId: response.data.conversationId });
           } else {
-            console.error('Error al crear conversación:', response.message || 'Error desconocido');
-            setConnectionStatus(`Error: ${response.message || 'No se pudo crear la conversación'}`);
+            console.error('Error creating conversation:', response.message || 'Unknown error');
+            setConnectionStatus(`Error: ${response.message || 'Could not create conversation'}`);
           }
         });
       } else {
-        console.error('No se puede crear conversación: Socket no conectado');
-        setConnectionStatus('Error: No hay conexión con el servidor');
+        console.error('Cannot create conversation: Socket not connected');
+        setConnectionStatus('Error: No connection to server');
       }
     };
 
-    // Función para manejar errores de conexión
     const handleConnectError = (err: Error) => {
-      console.error('Error de conexión WebSocket en cliente:', err.message);
+      console.error('WebSocket connection error in client:', err.message);
       setIsConnected(false);
-      setConnectionStatus(`Error de conexión: ${err.message}. Intentando reconectar...`);
+      setConnectionStatus(`Connection error: ${err.message}. Attempting to reconnect...`);
       
-      // Iniciar reconexión automática si no está ya en progreso
+      // Start automatic reconnection if not already in progress
       if (!reconnectInterval.current && reconnectAttempts.current < maxReconnectAttempts) {
         reconnectInterval.current = setInterval(() => {
           if (reconnectAttempts.current >= maxReconnectAttempts) {
@@ -163,26 +144,24 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
               clearInterval(reconnectInterval.current);
               reconnectInterval.current = null;
             }
-            setConnectionStatus(`No se pudo reconectar después de ${maxReconnectAttempts} intentos. Por favor, recarga la página.`);
+            setConnectionStatus(`Could not reconnect after ${maxReconnectAttempts} attempts. Please reload the page.`);
             return;
           }
           
           reconnectAttempts.current++;
-          setConnectionStatus(`Intentando reconectar (${reconnectAttempts.current}/${maxReconnectAttempts})...`);
+          setConnectionStatus(`Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts})...`);
           
-          // Reinicializar el socket
           initializeSocket();
         }, 5000);
       }
     };
 
-    // Función para manejar desconexiones
     const handleDisconnect = (reason: string) => {
-      console.log('Cliente desconectado del servidor WebSocket. Razón:', reason);
+      console.log('Client disconnected from WebSocket server. Reason:', reason);
       setIsConnected(false);
-      setConnectionStatus(`Desconectado: ${reason}. Intentando reconectar...`);
+      setConnectionStatus(`Disconnected: ${reason}. Attempting to reconnect...`);
       
-      // Iniciar reconexión automática si no está ya en progreso
+      // Start automatic reconnection if not already in progress
       if (!reconnectInterval.current && reconnectAttempts.current < maxReconnectAttempts) {
         reconnectInterval.current = setInterval(() => {
           if (reconnectAttempts.current >= maxReconnectAttempts) {
@@ -190,45 +169,40 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
               clearInterval(reconnectInterval.current);
               reconnectInterval.current = null;
             }
-            setConnectionStatus(`No se pudo reconectar después de ${maxReconnectAttempts} intentos. Por favor, recarga la página.`);
+            setConnectionStatus(`Could not reconnect after ${maxReconnectAttempts} attempts. Please reload the page.`);
             return;
           }
           
           reconnectAttempts.current++;
-          setConnectionStatus(`Intentando reconectar (${reconnectAttempts.current}/${maxReconnectAttempts})...`);
+          setConnectionStatus(`Attempting to reconnect (${reconnectAttempts.current}/${maxReconnectAttempts})...`);
           
-          // Reinicializar el socket
           initializeSocket();
         }, 5000);
       }
     };
 
-    // Función para manejar mensajes nuevos
     const handleNewMessage = (message: Message) => {
-      // Verificar si el mensaje pertenece a nuestra conversación activa
-      // Comparar como strings para evitar problemas de tipo
+      // Check if the message belongs to our active conversation
       const messageConvId = String(message.conversationId || '');
       const activeConvId = String(activeConversation || '');
       
       if (activeConversation && message.conversationId && 
           messageConvId === activeConvId) {
         
-        // Si el mensaje es del mismo usuario y tiene el mismo contenido que el último mensaje enviado,
-        // podría ser un duplicado enviado por el servidor
+        // Avoid duplicates of messages sent by the user
         if (lastSentMessageId.current && message.message === lastSentMessageId.current) {
-          // Actualizamos lastSentMessageId para evitar futuras confusiones
           lastSentMessageId.current = null;
           return;
         }
         
         setMessages((prev) => {
-          // Verificar si el mensaje ya existe en el array para evitar duplicados
+          // Check if the message already exists to avoid duplicates
           const isDuplicate = prev.some(
             (msg) => 
               msg.id === message.id || 
               (msg.message === message.message && 
               msg.sender === message.sender &&
-              Math.abs(new Date(msg.timestamp).getTime() - new Date(message.timestamp).getTime()) < 3000) // 3 segundos de margen
+              Math.abs(new Date(msg.timestamp).getTime() - new Date(message.timestamp).getTime()) < 3000) // 3 second margin
           );
           
           if (isDuplicate) {
@@ -244,48 +218,41 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         });
         
         scrollToBottom();
-      } else {
-        // Intentar añadir el mensaje de todos modos si tiene un conversationId válido
-        // Esto puede ayudar en casos donde activeConversation no se ha actualizado correctamente
-        if (message.conversationId) {
-          // Si no tenemos una conversación activa pero el mensaje tiene una, actualizar la conversación activa
-          if (!activeConversation) {
-            setActiveConversation(message.conversationId);
-            conversationCreated.current = true;
+      } else if (message.conversationId) {
+        // If we don't have an active conversation but the message has one, update the active conversation
+        if (!activeConversation) {
+          setActiveConversation(message.conversationId);
+          conversationCreated.current = true;
+        }
+        
+        setMessages((prev) => {
+          const isDuplicate = prev.some(
+            (msg) => 
+              msg.id === message.id || 
+              (msg.message === message.message && 
+              msg.sender === message.sender &&
+              Math.abs(new Date(msg.timestamp).getTime() - new Date(message.timestamp).getTime()) < 3000)
+          );
+          
+          if (isDuplicate) {
+            return prev;
           }
           
-          // Añadir el mensaje a la UI de todos modos
-          setMessages((prev) => {
-            // Verificar si el mensaje ya existe en el array para evitar duplicados
-            const isDuplicate = prev.some(
-              (msg) => 
-                msg.id === message.id || 
-                (msg.message === message.message && 
-                msg.sender === message.sender &&
-                Math.abs(new Date(msg.timestamp).getTime() - new Date(message.timestamp).getTime()) < 3000)
-            );
-            
-            if (isDuplicate) {
-              return prev;
-            }
-            
-            const newMessage = {
-              ...message,
-              id: message.id || `local_${Date.now()}`
-            };
-            
-            return [...prev, newMessage];
-          });
+          const newMessage = {
+            ...message,
+            id: message.id || `local_${Date.now()}`
+          };
           
-          scrollToBottom();
-        }
+          return [...prev, newMessage];
+        });
+        
+        scrollToBottom();
       }
     };
 
-    // Función para manejar el historial de mensajes
     const handleMessageHistory = (messages: Message[]) => {
       if (Array.isArray(messages)) {
-        // Asegurar que todos los mensajes tengan IDs
+        // Ensure all messages have IDs
         const messagesWithIds = messages.map(msg => ({
           ...msg,
           id: msg.id || `hist_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -297,10 +264,9 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       scrollToBottom();
     };
 
-    // Función para manejar confirmaciones de mensajes
     const handleMessageConfirmation = (response: MessageResponse) => {
       if (response.success) {
-        // Actualizar el último mensaje enviado con el ID del servidor
+        // Update the last sent message with the server ID
         setMessages(prev => {
           const lastMessage = prev[prev.length - 1];
           if (lastMessage && !lastMessage.id && lastMessage._localId) {
@@ -317,36 +283,29 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       }
     };
 
-    // Función para manejar las conversaciones del usuario
     const handleUserConversations = (conversations: Conversation[]) => {
       if (conversations && conversations.length > 0) {
-        // Usar la primera conversación activa
         const activeConv = conversations.find(conv => conv.status === 'active');
         if (activeConv) {
           setActiveConversation(activeConv.id);
-          conversationCreated.current = true; // Marcar que ya tenemos una conversación
-          
-          // Solicitar mensajes de esta conversación
+          conversationCreated.current = true;
           socket.emit('getMessages', { conversationId: activeConv.id });
         } else {
-          // Si no hay conversaciones activas, crear una nueva
           createConversation();
         }
       } else {
-        // Si no hay conversaciones, crear una nueva
         createConversation();
       }
     };
 
-    // Función para manejar la asignación de agente
     const handleAgentAssigned = (data: { conversationId: string; agentId: string }) => {
-      console.log('Agente asignado a la conversación:', data);
+      console.log('Agent assigned to conversation:', data);
       
       if (data.conversationId === activeConversation) {
-        // Notificar al usuario que un agente se ha unido al chat
+        // Notify the user that an agent has joined the chat
         const systemMessage: Message = {
           id: `system_${Date.now()}`,
-          message: 'Un agente se ha unido al chat y te atenderá en breve.',
+          message: 'An agent has joined the chat and will assist you shortly.',
           sender: 'system',
           timestamp: new Date().toISOString(),
           conversationId: activeConversation
@@ -355,14 +314,12 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         setMessages(prev => [...prev, systemMessage]);
         scrollToBottom();
       } else if (data.conversationId) {
-        // Si no coincide pero tenemos un ID de conversación válido, actualizar la conversación activa
         setActiveConversation(data.conversationId);
         conversationCreated.current = true;
         
-        // Notificar al usuario que un agente se ha unido al chat
         const systemMessage: Message = {
           id: `system_${Date.now()}`,
-          message: 'Un agente se ha unido al chat y te atenderá en breve.',
+          message: 'An agent has joined the chat and will assist you shortly.',
           sender: 'system',
           timestamp: new Date().toISOString(),
           conversationId: data.conversationId
@@ -373,14 +330,13 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       }
     };
 
-    // Función para manejar el archivado del chat
     const handleChatArchived = (data: { conversationId: string }) => {
-      console.log('Chat archivado:', data);
+      console.log('Chat archived:', data);
       if (data.conversationId === activeConversation) {
-        // Notificar al usuario que el chat ha sido archivado
+        // Notify the user that the chat has been archived
         const systemMessage: Message = {
           id: `system_${Date.now()}`,
-          message: 'Este chat ha sido archivado. Si necesitas más ayuda, por favor inicia un nuevo chat.',
+          message: 'This chat has been archived. If you need further assistance, please start a new chat.',
           sender: 'system',
           timestamp: new Date().toISOString(),
           conversationId: activeConversation
@@ -389,24 +345,21 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         setMessages(prev => [...prev, systemMessage]);
         scrollToBottom();
         
-        // Resetear el estado de la conversación
         setActiveConversation(null);
         conversationCreated.current = false;
       }
     };
 
-    // Función para manejar pings del servidor
     const handlePing = () => {
-      // Responder con un pong para mantener la conexión activa
       socket.emit('pong');
     };
 
-    // Registrar los event listeners
+    // Register event listeners
     socket.on('connect', handleConnect);
     socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
     socket.on('message', handleNewMessage);
-    socket.on('newMessage', handleNewMessage); // Asegurarse de escuchar ambos eventos
+    socket.on('newMessage', handleNewMessage); // Listen to both events
     socket.on('messageHistory', handleMessageHistory);
     socket.on('messageConfirmation', handleMessageConfirmation);
     socket.on('userConversations', handleUserConversations);
@@ -414,41 +367,36 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     socket.on('chatArchived', handleChatArchived);
     socket.on('ping', handlePing);
 
-    // Evento personalizado para depuración
     socket.on('error', (error: Error) => {
-      console.error('Error en el socket:', error);
-      setConnectionStatus(`Error en el socket: ${error.message || 'Desconocido'}`);
+      console.error('Socket error:', error);
+      setConnectionStatus(`Socket error: ${error.message || 'Unknown'}`);
     });
   };
 
-  // Inicializar el socket solo una vez
   useEffect(() => {
     if (!socketInitialized.current) {
       initializeSocket();
     }
     
-    // Configurar un ping periódico para mantener la conexión activa
+    // Periodic ping to keep the connection active
     const pingInterval = setInterval(() => {
       if (socketRef.current && socketRef.current.connected) {
         socketRef.current.emit('checkConnection');
       }
-    }, 30000); // Cada 30 segundos
+    }, 30000);
     
     return () => {
-      // Limpiar intervalos
       clearInterval(pingInterval);
       if (reconnectInterval.current) {
         clearInterval(reconnectInterval.current);
       }
       
-      // Desconectar el socket
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
     };
   }, []);
 
-  // Efecto para manejar cambios en la conversación activa
   useEffect(() => {
     if (activeConversation && socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('getMessages', { conversationId: activeConversation });
@@ -458,27 +406,24 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
   const sendMessage = () => {
     if (!input.trim() || !isConnected || !socketRef.current) return;
     
-    // Si no tenemos una conversación activa, cancelamos el envío
     if (!activeConversation) {
-      console.error('No hay una conversación activa, no se puede enviar el mensaje');
-      setConnectionStatus('Error: No hay una conversación activa');
+      console.error('No active conversation, cannot send message');
+      setConnectionStatus('Error: No active conversation');
       return;
     }
     
-    // Guardar el contenido del mensaje para verificar duplicados después
+    // Save message content to verify duplicates later
     lastSentMessageId.current = input;
     
-    // Crear un objeto de mensaje para enviar al servidor
     const messageData = {
       userId: chatId,
       message: input,
       conversationId: activeConversation
     };
     
-    // Enviar mensaje al servidor usando WebSocket
     socketRef.current.emit('clientMessage', messageData);
     
-    // Añadir mensaje a la UI inmediatamente
+    // Add message to UI immediately
     const newMessage: Message = {
       message: input,
       sender: 'client',
@@ -489,16 +434,14 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     
     setMessages((prev) => [...prev, newMessage]);
     
-    // Limpiar el input y hacer scroll
     setInput('');
     scrollToBottom();
   };
 
-  // Función para forzar la reconexión
   const forceReconnect = () => {
-    console.log('Forzando reconexión...');
+    console.log('Forcing reconnection...');
     reconnectAttempts.current = 0;
-    setConnectionStatus('Reconectando...');
+    setConnectionStatus('Reconnecting...');
     initializeSocket();
   };
 
@@ -604,7 +547,6 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
 };
 
 export default function ChatPage() {
-  // En una aplicación real, este ID vendría de la autenticación del usuario
   const userId = `user_${Math.floor(Math.random() * 10000)}`;
   
   return (
