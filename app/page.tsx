@@ -37,6 +37,16 @@ interface ConnectionResponse {
   timestamp?: string;
 }
 
+// Añadir nueva interfaz para las respuestas de joinChat y createConversation
+interface ChatResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    conversationId?: string;
+    [key: string]: unknown;
+  };
+}
+
 interface ChatProps {
   chatId: string; // El userId del cliente
 }
@@ -106,7 +116,15 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       }
       
       // Unirse al chat como usuario
-      socket.emit('joinChat', { userId: chatId });
+      socket.emit('joinChat', { userId: chatId }, (response: ChatResponse) => {
+        console.log('Respuesta de joinChat:', response);
+        if (response && response.success) {
+          // Solicitar las conversaciones del usuario
+          console.log('Solicitando conversaciones para usuario:', chatId);
+          // Verificar si hay conversaciones existentes para este usuario
+          socket.emit('getUserConversations', { userId: chatId });
+        }
+      });
       
       // Verificar la conexión
       socket.emit('checkConnection', (response: ConnectionResponse) => {
@@ -122,30 +140,29 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         return;
       }
       
-      // Enviar solicitud HTTP para crear una conversación
-      fetch('https://backoffice-casino-back-production.up.railway.app/chat/start-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: chatId }),
-      })
-        .then(response => response.json())
-        .then(data => {
-          if (data.data && data.data.conversationId) {
-            setActiveConversation(data.data.conversationId);
-            console.log('ID de conversación activa:', data.data.conversationId);
+      // Usar WebSocket para crear una conversación
+      if (socket.connected) {
+        console.log('Creando conversación vía WebSocket para usuario:', chatId);
+        socket.emit('createConversation', { userId: chatId }, (response: ChatResponse) => {
+          console.log('Respuesta de createConversation:', response);
+          if (response.success && response.data && response.data.conversationId) {
+            setActiveConversation(response.data.conversationId);
+            console.log('ID de conversación activa:', response.data.conversationId);
             
             // Marcar que ya se ha creado una conversación
             conversationCreated.current = true;
             
             // Solicitar el historial de mensajes de esta conversación
-            socket.emit('getMessages', { conversationId: data.data.conversationId });
+            socket.emit('getMessages', { conversationId: response.data.conversationId });
+          } else {
+            console.error('Error al crear conversación:', response.message || 'Error desconocido');
+            setConnectionStatus(`Error: ${response.message || 'No se pudo crear la conversación'}`);
           }
-        })
-        .catch(error => {
-          console.error('Error al crear conversación:', error);
         });
+      } else {
+        console.error('No se puede crear conversación: Socket no conectado');
+        setConnectionStatus('Error: No hay conexión con el servidor');
+      }
     };
 
     // Función para manejar errores de conexión
