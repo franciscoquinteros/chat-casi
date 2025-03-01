@@ -31,12 +31,6 @@ interface MessageResponse {
   timestamp?: unknown;
 }
 
-interface ConnectionResponse {
-  status: string;
-  socketId?: string;
-  timestamp?: string;
-}
-
 // Añadir nueva interfaz para las respuestas de joinChat y createConversation
 interface ChatResponse {
   success: boolean;
