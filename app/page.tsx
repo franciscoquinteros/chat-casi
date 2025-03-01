@@ -70,8 +70,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       socketRef.current.close();
     }
 
-    // socketRef.current = io('https://backoffice-casino-back-production.up.railway.app', {
-    socketRef.current = io('http://localhost:8000', {
+    socketRef.current = io('https://backoffice-casino-back-production.up.railway.app', {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
