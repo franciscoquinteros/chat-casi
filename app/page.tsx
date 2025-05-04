@@ -45,6 +45,7 @@ interface ChatProps {
 
 const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [officeId, setOfficeId] = useState<string>('1');
   const [input, setInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('Conectando al chat...');
@@ -101,9 +102,15 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         reconnectInterval.current = null;
       }
 
-      socket.emit('joinChat', { userId: chatId }, (response: ChatResponse) => {
+      socket.emit('joinChat', { 
+        userId: chatId,
+        officeId: officeId
+      }, (response: ChatResponse) => {
         if (response && response.success) {
-          socket.emit('getUserConversations', { userId: chatId });
+          socket.emit('getUserConversations', { 
+            userId: chatId,
+            officeId: officeId
+          });
         }
       });
 
@@ -361,6 +368,8 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       initializeSocket();
     }
 
+    setOfficeId('1');
+
     // Periodic ping to keep the connection active
     const pingInterval = setInterval(() => {
       if (socketRef.current && socketRef.current.connected) {
@@ -388,125 +397,91 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
 
   const sendMessage = () => {
     if (!input.trim() || !isConnected || !socketRef.current || isSending) return;
-
-    // Set sending state to true at the beginning
     setIsSending(true);
-    
-    // Set a timeout to reset the sending state in case the server doesn't respond
-    const messageTimeout = setTimeout(() => {
-      if (isSending) {
-        console.log('El mensaje está tardando demasiado, restableciendo estado de envío');
-        setIsSending(false);
-        setConnectionStatus('El mensaje tardó demasiado en enviarse. Intenta de nuevo.');
-      }
-    }, 15000); // 15 segundos de timeout
 
-    // If no active conversation, create one before sending the message
-    if (!activeConversation) {
-      if (conversationCreated.current) {
-        console.error('La bandera de conversación está activa pero no hay ID de conversación, estado inconsistente');
-        setConnectionStatus('Error: Estado de conversación inconsistente');
-        setIsSending(false);
-        clearTimeout(messageTimeout);
-        return;
-      }
+    const socket = socketRef.current;
+    const localId = `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-      if (socketRef.current.connected) {
-        setConnectionStatus('Creando conversación para enviar el mensaje...');
-        
-        socketRef.current.emit('createConversation', { userId: chatId }, (response: ChatResponse) => {
-          if (response.success && response.data && response.data.conversationId) {
-            setActiveConversation(response.data.conversationId);
-            conversationCreated.current = true;
-            setConnectionStatus('Enviando mensaje...');
-            
-            // Now that we have a conversation ID, send the message
-            const messageData = {
-              userId: chatId,
-              message: input,
-              conversationId: response.data.conversationId
-            };
-            
-            // Save message content to verify duplicates later
-            lastSentMessageId.current = input;
-            
-            socketRef.current?.emit('clientMessage', messageData, () => {
-              setConnectionStatus('Conectado');
-            });
-            
-            // Add message to UI immediately
-            const newMessage: Message = {
-              message: input,
-              sender: 'client',
-              timestamp: new Date().toISOString(),
-              conversationId: response.data.conversationId,
-              _localId: Date.now().toString()
-            };
-            
-            // Add system message followed by user message
-            const systemMessage: Message = {
-              id: `system_${Date.now()}`,
-              message: 'Conversación iniciada. Bienvenido al chat de soporte.',
-              sender: 'system',
-              timestamp: new Date().toISOString(),
-              conversationId: response.data.conversationId
-            };
-            
-            setMessages([systemMessage, newMessage]);
-            setInput('');
-            scrollToBottom();
-            setIsSending(false);
-            clearTimeout(messageTimeout);
-          } else {
-            console.error('Error al crear conversación:', response.message || 'Error desconocido');
-            setConnectionStatus(`Error: ${response.message || 'No se pudo crear la conversación'}`);
-            setIsSending(false);
-            clearTimeout(messageTimeout);
-          }
-        });
-        
-        return; // Exit early since we're handling the message sending in the callback
-      } else {
-        console.error('No se puede crear conversación: Socket no conectado');
-        setConnectionStatus('Error: Sin conexión al servidor');
-        setIsSending(false);
-        clearTimeout(messageTimeout);
-        return;
-      }
-    }
-
-    // If we have an active conversation already, proceed with normal message sending
-    // Save message content to verify duplicates later
-    lastSentMessageId.current = input;
-
-    // Update status message
-    setConnectionStatus('Enviando mensaje...');
-
-    const messageData = {
+    const tempMessage: Message = {
+      _localId: localId,
       userId: chatId,
-      message: input,
-      conversationId: activeConversation
-    };
-
-    socketRef.current.emit('clientMessage', messageData, () => {
-      // Callback when the message has been processed by the server
-      setIsSending(false);
-      clearTimeout(messageTimeout);
-      setConnectionStatus('Conectado');
-    });
-
-    // Add message to UI immediately
-    const newMessage: Message = {
       message: input,
       sender: 'client',
       timestamp: new Date().toISOString(),
-      conversationId: activeConversation,
-      _localId: Date.now().toString()
+      conversationId: activeConversation || undefined // Include active conversation if available
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages((prev) => [...prev, tempMessage]);
+    lastSentMessageId.current = input;
     setInput('');
     scrollToBottom();
+
+    // Ensure conversation exists or create one
+    if (!activeConversation) {
+      if (!conversationCreated.current) {
+        console.log('No active conversation, attempting to create one...');
+        socket.emit('createConversation', {
+          userId: chatId,
+          officeId: officeId
+        }, (response: ChatResponse) => {
+          if (response && response.success && response.data?.conversationId) {
+            const newConversationId = response.data.conversationId;
+            console.log(`Conversation created/found: ${newConversationId}`);
+            setActiveConversation(newConversationId);
+            conversationCreated.current = true; // Mark as created
+
+            // Retry sending the message with the new conversation ID
+            socket.emit('clientMessage', {
+              userId: chatId,
+              message: tempMessage.message,
+              conversationId: newConversationId
+            }, (ack: MessageResponse) => {
+              setIsSending(false);
+              if (ack && ack.success && ack.data?.messageId) {
+                // Update message ID on success
+                setMessages(prev => prev.map(msg =>
+                  msg._localId === localId ? { ...msg, id: ack.data?.messageId, _localId: undefined } : msg
+                ));
+              } else {
+                console.error('Error sending message after creating conversation:', ack?.message);
+                // Handle error: maybe mark the message as failed
+              }
+            });
+          } else {
+            setIsSending(false);
+            console.error('Failed to create or find conversation:', response?.message);
+            // Handle error: remove temp message or mark as failed
+            setMessages(prev => prev.filter(msg => msg._localId !== localId));
+            lastSentMessageId.current = null; // Reset last sent message
+          }
+        });
+      } else {
+        setIsSending(false);
+        console.warn('Cannot send message: Still waiting for conversation creation confirmation.');
+        // Optionally re-add input to the text area
+        setInput(tempMessage.message);
+        setMessages(prev => prev.filter(msg => msg._localId !== localId)); // Remove temp message
+        lastSentMessageId.current = null;
+      }
+    } else {
+      // If conversation already exists, send the message directly
+      socket.emit('clientMessage', {
+        userId: chatId,
+        message: tempMessage.message,
+        conversationId: activeConversation
+      }, (ack: MessageResponse) => {
+        setIsSending(false);
+        if (ack && ack.success && ack.data?.messageId) {
+          // Update message ID on success
+          setMessages(prev => prev.map(msg =>
+            msg._localId === localId ? { ...msg, id: ack.data?.messageId, _localId: undefined } : msg
+          ));
+        } else {
+          console.error('Error sending message:', ack?.message);
+          // Handle error: maybe mark the message as failed
+        }
+      });
+    }
   };
 
   const forceReconnect = () => {
