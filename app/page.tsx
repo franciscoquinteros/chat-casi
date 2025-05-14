@@ -45,7 +45,7 @@ interface ChatProps {
 
 const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [officeId, setOfficeId] = useState<string>('1');
+  const [officeId, setOfficeId] = useState<string>('214147');
   const [input, setInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('Conectando al chat...');
@@ -102,12 +102,12 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
         reconnectInterval.current = null;
       }
 
-      socket.emit('joinChat', { 
+      socket.emit('joinChat', {
         userId: chatId,
         officeId: officeId
       }, (response: ChatResponse) => {
         if (response && response.success) {
-          socket.emit('getUserConversations', { 
+          socket.emit('getUserConversations', {
             userId: chatId,
             officeId: officeId
           });
@@ -350,7 +350,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
     socket.on('ping', handlePing);
 
     // Add handler for message errors if the event exists
-    socket.on('messageError', (error: {message: string}) => {
+    socket.on('messageError', (error: { message: string }) => {
       console.error('Error al enviar el mensaje:', error);
       setConnectionStatus(`Error: ${error.message || 'Error al enviar el mensaje'}`);
       setIsSending(false);
@@ -368,7 +368,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
       initializeSocket();
     }
 
-    setOfficeId('1');
+    setOfficeId('214147');
 
     // Periodic ping to keep the connection active
     const pingInterval = setInterval(() => {
@@ -519,15 +519,15 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
               <div
                 key={msg.id || msg._localId || `msg-${index}`}
                 className={`flex ${msg.sender === 'client' ? 'justify-end' :
-                    msg.sender === 'system' ? 'justify-center' : 'justify-start'
+                  msg.sender === 'system' ? 'justify-center' : 'justify-start'
                   } mb-4`}
               >
                 <div
                   className={`max-w-[80%] p-3 rounded-lg shadow ${msg.sender === 'client'
-                      ? 'bg-blue-500 text-white'
-                      : msg.sender === 'system'
-                        ? 'bg-gray-300 text-gray-800 text-center'
-                        : 'bg-gray-200 text-gray-800'
+                    ? 'bg-blue-500 text-white'
+                    : msg.sender === 'system'
+                      ? 'bg-gray-300 text-gray-800 text-center'
+                      : 'bg-gray-200 text-gray-800'
                     }`}
                 >
                   <p>{msg.message}</p>
@@ -546,13 +546,12 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
           )
         ) : (
           <div className="text-center">
-            <p className={`mb-2 ${
-              connectionStatus.includes('Enviando') || connectionStatus.includes('Creando') 
+            <p className={`mb-2 ${connectionStatus.includes('Enviando') || connectionStatus.includes('Creando')
                 ? 'text-blue-500 font-medium animate-pulse'
                 : connectionStatus.includes('Error')
                   ? 'text-red-500'
                   : 'text-gray-500'
-            }`}>
+              }`}>
               {connectionStatus}
             </p>
             <p className="text-xs text-gray-400">Socket ID: {socketId || 'No conectado'}</p>
@@ -579,7 +578,7 @@ const ChatCliente: React.FC<ChatProps> = ({ chatId }) => {
           disabled={!isConnected || !input.trim() || isSending}
         >
           {isSending ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" title="Enviando..."/>
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" title="Enviando..." />
           ) : (
             <svg
               xmlns="http://www.w3.org/2000/svg"
